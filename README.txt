@@ -1,22 +1,23 @@
-Google-Translate-TTS
+Google Translate TTS WordList
 ====================
 
-A python script for using Google's undocumented TTS api to save text to an MP3 file.
-
-For more background, check out this [blog post](http://www.hung-truong.com/blog/2013/04/26/hacking-googles-text-to-speech-api/).
+A modified version of
+[hungtruong/Google-Translate-TTS]
+(https://github.com/hungtruong/Google-Translate-TTS)
+which can take a newline separated list of words.
 
 ```
-usage: GoogleTTS.py [-h] [-o [OUTPUT]] [-l [LANGUAGE]]
+usage: GoogleTTS.py [-h] [-l [LANGUAGE]] [-e [ENCODING]]
                     (-f FILE | -s STRING [STRING ...])
 
-Google TTS Downloader.
+Google TTS Word Generator
 
 optional arguments:
   -h, --help            show this help message and exit
-  -o [OUTPUT], --output [OUTPUT]
-                        Filename to output audio to
   -l [LANGUAGE], --language [LANGUAGE]
-                        Language to output text to.
+                        Language of the output text (eg. "en").
+  -e [ENCODING], --encoding [ENCODING]
+                        Encoding of the input text (eg. "ascii", "utf-8").
   -f FILE, --file FILE  File to read text from.
   -s STRING [STRING ...], --string STRING [STRING ...]
                         A string of text to convert to speech.
@@ -29,11 +30,11 @@ Examples
 To convert a list of words, separated by newlines from a file:
 
 ```
-GoogleTTS.py -f test.csv
+GoogleTTS.py -l ru -e utf-8 -f test.csv
 ```
 
-To convert text from the commandline to a named file:
+To convert text from the command line to a file:
 
 ```
-GoogleTTS.py -l en -o hello.mp3 -s hello
+GoogleTTS.py -l en -e ascii -s hello
 ```

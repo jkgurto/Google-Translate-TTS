@@ -2,21 +2,97 @@
 
 import sys
 import argparse
-import re
-import urllib, urllib2
+import urllib.parse
+import urllib.request
+import urllib.response
+import urllib.error
 import time
-def main():
-    description='Google TTS Downloader.'
-    parser = argparse.ArgumentParser(description=description,
-                                     epilog='tunnel snakes rule')
 
-    parser.add_argument('-o','--output',action='store',nargs='?',
-                        help='Filename to output audio to',
-                        type=argparse.FileType('w'), default='out.mp3')
-    parser.add_argument('-l','--language', action='store', nargs='?',help='Language to output text to.',default='en')
+def convertFile(fileName, language, encoding):
+
+    fileData = open(fileName, encoding=encoding, mode='r')
+    text = fileData.read()
+    fileData.close()
+
+    lines = text.splitlines()
+    for word in lines:
+        convertWord(language, encoding, word)
+        time.sleep(0.5)
+
+def convertWord(language, encoding, word):
+
+    wordLen = len(word)
+    if wordLen == 0:
+        print("Word has no length")
+        return
+    elif wordLen > 100:
+        print("Word is more than 100 characters")
+        return
+
+    try:
+        quotedWord = urllib.parse.quote(word, encoding=encoding)
+    except urllib.error.UnicodeEncodeError as e:
+        print("Error quoting string", str(e))
+        return
+
+    outputFileName = word + ".mp3"
+    print('Saved MP3 to %s' % outputFileName.encode(encoding))
+
+    # Eg.
+    # http://translate.google.com/translate_tts?tl=en&q=hello&total=5&idx=0
+    idx = 0
+    mp3url =\
+"http://translate.google.com/\
+translate_tts?tl=%s&q=%s&total=%s&idx=%s" % \
+        (language, quotedWord, wordLen, idx)
+
+    # Pretend to be human
+    headers = {
+        "Host":"translate.google.com",
+        "Referer":"http://www.gstatic.com/translate/sound_player2.swf",
+        "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_3) \
+AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.163 Safari/535.19"
+    }
+
+    requestData = urllib.request.Request(mp3url, None, headers)
+
+    try:
+        print("Requesting", mp3url)
+
+        response = urllib.request.urlopen(requestData)
+        responseData = response.read()
+
+        file = open(outputFileName, 'wb')
+        file.write(responseData)
+        file.close()
+        print('Saved MP3 to %s' % outputFileName.encode(encoding))
+
+    except urllib.error.HTTPError as e:
+        print("Error making request", str(e))
+
+def main():
+    description='Google TTS Word Generator'
+    parser = argparse.ArgumentParser(description=description)
+
+    parser.add_argument('-l','--language', 
+        action='store', 
+        nargs='?',
+        help='Language of the output text (eg. "en").',
+        default='en')
+
+    parser.add_argument('-e','--encoding', 
+        action='store', 
+        nargs='?',
+        help='Encoding of the input text (eg. "ascii", "utf-8").',
+        default='ascii')
+
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('-f','--file',type=argparse.FileType('r'),help='File to read text from.')
-    group.add_argument('-s', '--string',action='store',nargs='+',help='A string of text to convert to speech.')
+    group.add_argument('-f','--file',
+        help='File to read text from.')
+    group.add_argument('-s', '--string',
+        action='store',
+        nargs='+',
+        help='A string of text to convert to speech.')
 
     if len(sys.argv)==1:
        parser.print_help()
@@ -24,52 +100,12 @@ def main():
 
     args = parser.parse_args()
     if args.file:
-        text = args.file.read()
-    if args.string:
-        text = ' '.join(map(str,args.string))
+        convertFile(args.file, args.language, args.encoding)
 
-    #process text into chunks
-    text = text.replace('\n','')
-    text_list = re.split('(\,|\.)', text)
-    combined_text = []
-    for idx, val in enumerate(text_list):
-        if idx % 2 == 0:
-            combined_text.append(val)
-        else:
-            joined_text = ''.join((combined_text.pop(),val))
-            if len(joined_text) < 100:
-                combined_text.append(joined_text)
-            else:
-                subparts = re.split('( )', joined_text)
-                temp_string = ""
-                temp_array = []
-                for part in subparts:
-                    temp_string = temp_string + part
-                    if len(temp_string) > 80:
-                        temp_array.append(temp_string)
-                        temp_string = ""
-                #append final part
-                temp_array.append(temp_string)
-                combined_text.extend(temp_array)
-    #download chunks and write them to the output file
-    for idx, val in enumerate(combined_text):
-        mp3url = "http://translate.google.com/translate_tts?tl=%s&q=%s&total=%s&idx=%s" % (args.language, urllib.quote(val), len(combined_text), idx)
-        headers = {"Host":"translate.google.com",
-          "Referer":"http://www.gstatic.com/translate/sound_player2.swf",
-          "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_3) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.163 Safari/535.19"}
-        req = urllib2.Request(mp3url, '', headers)
-        sys.stdout.write('.')
-        sys.stdout.flush()
-        if len(val) > 0:
-            try:
-                response = urllib2.urlopen(req)
-                args.output.write(response.read())
-                time.sleep(.5)
-            except urllib2.HTTPError as e:
-                print ('%s' % e)
-    args.output.close()
-
-    print('Saved MP3 to %s' % args.output.name)
+    elif args.string:
+        word = ' '.join(map(str,args.string))
+        convertWord(args.language, args.encoding, word)
 
 if __name__ == "__main__":
     main()
+

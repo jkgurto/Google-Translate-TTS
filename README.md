@@ -6,6 +6,8 @@ A modified version of
 (https://github.com/hungtruong/Google-Translate-TTS)
 which can take a newline separated list of words.
 
+Requires Python 3.4.
+
 ```
 usage: GoogleTTS.py [-h] [-l [LANGUAGE]] [-e [ENCODING]]
                     (-f FILE | -s STRING [STRING ...])

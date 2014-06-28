@@ -1,20 +1,89 @@
 #!/usr/bin/python
 
-import sys
 import argparse
+import codecs
+import sys
+import time
 import urllib.parse
 import urllib.request
 import urllib.response
 import urllib.error
-import time
+
+BOMS = (
+    (codecs.BOM_UTF8, "utf-8"),
+    (codecs.BOM_UTF32_BE, "utf-32-be"),
+    (codecs.BOM_UTF32_LE, "utf-32-le"),
+    (codecs.BOM_UTF16_BE, "utf-16-be"),
+    (codecs.BOM_UTF16_LE, "utf-16-le"),
+)
+
+DEFAULT_ENCODING = "utf-8"
+
+def getEncodingFromBom(data):
+    '''
+    Get the name of the encoding from the BOM.
+    Returns tuple of
+        (name of detected encoding,
+        data with encoding stripped off)
+    http://unicodebook.readthedocs.org/guess_encoding.html
+    '''
+    dataBytes = data.encode()
+
+    for bom, encoding in BOMS:
+        if dataBytes.startswith(bom):
+            #print("Detected file encoding from BOM %s" % (encoding,))
+            # Slice off BOM
+            return (encoding, data[1:])
+
+    #print("Could not detect BOM")
+    return (None, data)
 
 def convertFile(fileName, language, encoding):
 
     fileData = open(fileName, encoding=encoding, mode='r')
-    text = fileData.read()
+    rawText = fileData.read()
     fileData.close()
 
-    lines = text.splitlines()
+    # Get BOM
+    (detectedEncoding, text) = getEncodingFromBom(rawText)
+    if (detectedEncoding is not None and
+        detectedEncoding != encoding):
+
+        print("Warning: expected encoding %s, but file BOM is %s" %
+            (encoding, detectedEncoding))
+
+        encoding = detectedEncoding
+    
+    textString = text
+    textString = textString.lower()
+
+    # Weekly words list is a
+    # string of the format "English Russian, English Russian .."
+    # - write word pairs to csv
+    # - get TTS for Russian
+    wordPairs = textString.split(",")
+    if len(wordPairs) > 1:
+
+        textString = ""
+        csvText = ""
+
+        for wordPair in wordPairs:
+            wordPair = wordPair.strip()
+            (englishWord, sep, russianWord) = wordPair.rpartition(" ")
+            csvText = csvText + russianWord + "," + englishWord + "\n"
+            textString = textString + russianWord + "\n"
+
+        outCsvName = "out.csv"
+        print("Writing to", outCsvName)
+        try:
+            outFile = open(outCsvName, encoding=encoding, mode="w")
+            outFile.write(csvText)
+            outFile.close()
+        except IOError as e:
+            print(repr(e))
+
+    # Text in the form of "Russian\nRussian\nRussian"
+    lines = textString.splitlines()
     for word in lines:
         convertWord(language, encoding, word)
         time.sleep(0.5)
@@ -36,7 +105,6 @@ def convertWord(language, encoding, word):
         return
 
     outputFileName = word + ".mp3"
-    print('Saved MP3 to %s' % outputFileName.encode(encoding))
 
     # Eg.
     # http://translate.google.com/translate_tts?tl=en&q=hello&total=5&idx=0
@@ -57,7 +125,7 @@ AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.163 Safari/535.19"
     requestData = urllib.request.Request(mp3url, None, headers)
 
     try:
-        print("Requesting", mp3url)
+        #print("Requesting", mp3url)
 
         response = urllib.request.urlopen(requestData)
         responseData = response.read()
@@ -65,7 +133,7 @@ AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.163 Safari/535.19"
         file = open(outputFileName, 'wb')
         file.write(responseData)
         file.close()
-        print('Saved MP3 to %s' % outputFileName.encode(encoding))
+        print('Saved MP3 to %s' % (outputFileName,))
 
     except urllib.error.HTTPError as e:
         print("Error making request", str(e))
@@ -84,7 +152,7 @@ def main():
         action='store', 
         nargs='?',
         help='Encoding of the input text (eg. "ascii", "utf-8").',
-        default='ascii')
+        default=DEFAULT_ENCODING)
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-f','--file',

@@ -38,7 +38,13 @@ def getEncodingFromBom(data):
     #print("Could not detect BOM")
     return (None, data)
 
-def convertFile(fileName, language, encoding):
+def convertFile(fileName,
+    newlineDelimiter,
+    wordDelimiter,
+    language,
+    language1,
+    language2,
+    encoding):
 
     fileData = open(fileName, encoding=encoding, mode='r')
     rawText = fileData.read()
@@ -61,17 +67,34 @@ def convertFile(fileName, language, encoding):
     # string of the format "English Russian, English Russian .."
     # - write word pairs to csv
     # - get TTS for Russian
-    wordPairs = textString.split(",")
+    wordPairs = textString.split(newlineDelimiter)
     if len(wordPairs) > 1:
 
         textString = ""
         csvText = ""
 
         for wordPair in wordPairs:
-            wordPair = wordPair.strip()
-            (englishWord, sep, russianWord) = wordPair.rpartition(" ")
-            csvText = csvText + russianWord + "," + englishWord + "\n"
-            textString = textString + russianWord + "\n"
+            language1Word = None
+            language2Word = None
+            if not language2:
+                language1Word = wordPair.strip()
+            else:
+                (language1Word, sep, language2Word) = \
+                    wordPair.rpartition(wordDelimiter)
+                language1Word = language1Word.strip()
+                language2Word = language2Word.strip()
+            
+            # Ignore blank lines
+            if language1Word and (not language2 or language2Word):
+                csvText = csvText + language1Word
+                if language2Word:
+                    csvText = csvText + wordDelimiter + language2Word
+                csvText = csvText + newlineDelimiter
+
+                if language == language1:
+                    textString = textString + language1Word + "\n"
+                elif language == language2:
+                    textString = textString + language2Word + "\n"
 
         outCsvName = "out.csv"
         print("Writing to", outCsvName)
@@ -84,11 +107,13 @@ def convertFile(fileName, language, encoding):
 
     # Text in the form of "Russian\nRussian\nRussian"
     lines = textString.splitlines()
+    wordNumber = 1
     for word in lines:
-        convertWord(language, encoding, word)
+        convertWord(language, encoding, word, str(wordNumber))
+        wordNumber = wordNumber + 1
         time.sleep(0.5)
 
-def convertWord(language, encoding, word):
+def convertWord(language, encoding, word, wordNumber=""):
 
     wordLen = len(word)
     if wordLen == 0:
@@ -104,7 +129,7 @@ def convertWord(language, encoding, word):
         print("Error quoting string", str(e))
         return
 
-    outputFileName = word + ".mp3"
+    outputFileName = wordNumber + word + ".mp3"
 
     # Eg.
     # http://translate.google.com/translate_tts?tl=en&q=hello&total=5&idx=0
@@ -133,7 +158,11 @@ AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.163 Safari/535.19"
         file = open(outputFileName, 'wb')
         file.write(responseData)
         file.close()
-        print('Saved MP3 to %s' % (outputFileName,))
+        try:
+            print('Saved MP3 to %s' %
+            (outputFileName.encode(encoding, errors="replace"),))
+        except UnicodeEncodeError as e:
+            print('Saved MP3 to %s' % (e,))
 
     except urllib.error.HTTPError as e:
         print("Error making request", str(e))
@@ -145,14 +174,37 @@ def main():
     parser.add_argument('-l','--language', 
         action='store', 
         nargs='?',
-        help='Language of the output text (eg. "en").',
+        help='Language for which to generate TTS (eg. "en").',
         default='en')
+
+    parser.add_argument('-l1','--language1', 
+        action='store', 
+        nargs='?',
+        help='1st language of the input text (eg. "en").')
+
+    parser.add_argument('-l2','--language2', 
+        action='store', 
+        nargs='?',
+        help='2nd language of the input text (eg. "en").')
+
 
     parser.add_argument('-e','--encoding', 
         action='store', 
         nargs='?',
         help='Encoding of the input text (eg. "ascii", "utf-8").',
         default=DEFAULT_ENCODING)
+
+    parser.add_argument('-nd', '--newlinedelimiter',
+        action='store',
+        nargs='?',
+        help='Separator between newlines in file. (eg. "\n")',
+        default='\n')
+    parser.add_argument('-wd', '--worddelimiter',
+        action='store',
+        nargs='?',
+        help='Separator between words in file. (eg. ",", "\t")',
+        default=',')
+
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-f','--file',
@@ -161,14 +213,36 @@ def main():
         action='store',
         nargs='+',
         help='A string of text to convert to speech.')
-
+    
     if len(sys.argv)==1:
        parser.print_help()
        sys.exit(1)
 
     args = parser.parse_args()
+
+    
     if args.file:
-        convertFile(args.file, args.language, args.encoding)
+        # Convert escaped character such as "\t", "\n" to real tabs, newlines
+        unicodeDelimiter = args.newlinedelimiter.encode()
+        newlineDelimiter = unicodeDelimiter.decode('unicode_escape')
+
+        unicodeDelimiter = args.worddelimiter.encode()
+        wordDelimiter = unicodeDelimiter.decode('unicode_escape')
+
+        # Decide on input languages if not given
+        language1 = args.language1
+        if not language1:
+            language1 = args.language
+
+        # Language 2 can be None
+
+        convertFile(args.file,
+            newlineDelimiter,
+            wordDelimiter,
+            args.language,
+            args.language1,
+            args.language2,
+            args.encoding)
 
     elif args.string:
         word = ' '.join(map(str,args.string))

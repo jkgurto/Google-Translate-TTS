@@ -85,11 +85,13 @@ def convertFile(fileName,
                 language2Word = language2Word.strip()
             
             # Ignore blank lines
+            csvWordDelimiter = "\t"
+            csvNewlineDelimiter = "\n"
             if language1Word and (not language2 or language2Word):
                 csvText = csvText + language1Word
                 if language2Word:
-                    csvText = csvText + wordDelimiter + language2Word
-                csvText = csvText + newlineDelimiter
+                    csvText = csvText + csvWordDelimiter + language2Word
+                csvText = csvText + csvNewlineDelimiter
 
                 if language == language1:
                     textString = textString + language1Word + "\n"

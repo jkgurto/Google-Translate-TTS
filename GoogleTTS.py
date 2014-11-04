@@ -88,9 +88,9 @@ def convertFile(fileName,
             csvWordDelimiter = "\t"
             csvNewlineDelimiter = "\n"
             if language1Word and (not language2 or language2Word):
-                csvText = csvText + language1Word
                 if language2Word:
-                    csvText = csvText + csvWordDelimiter + language2Word
+                    csvText = csvText + language2Word + csvWordDelimiter
+                csvText = csvText + language1Word
                 csvText = csvText + csvNewlineDelimiter
 
                 if language == language1:

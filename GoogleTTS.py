@@ -133,6 +133,18 @@ def convertWord(language, encoding, word, wordNumber=""):
 
     outputFileName = wordNumber + word + ".mp3"
 
+    # Remove invalid characters from file name
+    # and replace with "-"
+    outputFileName = outputFileName.replace("<", "-")
+    outputFileName = outputFileName.replace(">", "-")
+    outputFileName = outputFileName.replace(":", "-")
+    outputFileName = outputFileName.replace("\"", "-")
+    outputFileName = outputFileName.replace("/", "-")
+    outputFileName = outputFileName.replace("\\", "-")
+    outputFileName = outputFileName.replace("|", "-")
+    outputFileName = outputFileName.replace("?", "-")
+    outputFileName = outputFileName.replace("*", "-")
+
     # Eg.
     # http://translate.google.com/translate_tts?tl=en&q=hello&total=5&idx=0
     idx = 0
